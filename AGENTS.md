@@ -4,6 +4,8 @@ This repository is the product and release home for LibreEcho: landing content,
 cross-repository public documentation, release notes, and release tooling. Read
 `CONTRIBUTING.md` for change-ownership routing before non-trivial work.
 
+Downstream maintenance: read `docs/downstream-maintenance.md` before syncing upstream or changing patches.
+
 ## Agent operating contract
 
 These rules govern normal task execution, subject to higher-priority system and
