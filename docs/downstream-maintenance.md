@@ -14,7 +14,7 @@ repositories.
 
 | Repository | Patch | Branch | Status |
 | --- | --- | --- | --- |
-| LibreEcho-Platform | Accept the compatible MT8163 owner-firmware revision | `fix/owner-firmware-variants` | Pending Forgejo PR |
+| LibreEcho-Platform | Accept the compatible MT8163 owner-firmware revision | `fix/owner-firmware-variants` | Forgejo PR 1, pending merge |
 | LibreEcho-UI | Emit Wyoming 1.10 artifact metadata | `fix/wyoming-info-schema` | Forgejo PR 1, pending merge |
 | LibreEcho-UI | Keep Home Assistant and voice-pipeline modes synchronized | `fix/home-assistant-mode-sync` | Forgejo PR 2, pending merge |
 
