@@ -134,7 +134,9 @@ SSH_ROOT_PASSWORD_HASH="${LIBREECHO_SSH_ROOT_PASSWORD_HASH:-}"
 JOBS="${JOBS:-$(nproc)}"
 OTA_DIR="$TOOLS_DIR/ota"
 OTA_PUBLIC_KEY="$OTA_DIR/ota-public-key.hex"
+OTA_OWNER_PUBLIC_KEY="${LIBREECHO_OTA_OWNER_PUBLIC_KEY:-}"
 OTA_SIGNING_KEY="${LIBREECHO_OTA_SIGNING_KEY:-$PRIVATE_ROOT/ota-signing-key.hex}"
+OTA_SIGNING_PUBLIC_KEY="${LIBREECHO_OTA_SIGNING_PUBLIC_KEY:-$OTA_PUBLIC_KEY}"
 OTA_SIGNING_MODE="${LIBREECHO_OTA_SIGNING_MODE:-github}"
 OTA_SODIUM_ROOT="$LIBSODIUM_OUTPUT"
 OTA_SODIUM_A="$OTA_SODIUM_ROOT/lib/libsodium.a"
@@ -500,6 +502,27 @@ git -C "$UI_SOURCE" rev-parse --show-toplevel >/dev/null 2>&1 || {
 }
 [[ -f "$BOOT_ENVELOPE_GENERATOR" ]] || { echo "ERROR: boot-envelope generator is missing" >&2; exit 1; }
 [[ -f "$OTA_PUBLIC_KEY" && ! -L "$OTA_PUBLIC_KEY" ]] || { echo "ERROR: missing OTA public key" >&2; exit 1; }
+[[ -f "$OTA_SIGNING_PUBLIC_KEY" && ! -L "$OTA_SIGNING_PUBLIC_KEY" ]] || {
+  echo "ERROR: OTA signing public key is missing or unsafe: $OTA_SIGNING_PUBLIC_KEY" >&2
+  exit 1
+}
+ota_signing_public_key_sha="$(sha256sum "$OTA_SIGNING_PUBLIC_KEY" | awk '{print $1}')"
+owner_key_builder_args=()
+owner_key_verifier_args=()
+ota_owner_public_key_sha=
+if [[ -n "$OTA_OWNER_PUBLIC_KEY" ]]; then
+  [[ -f "$OTA_OWNER_PUBLIC_KEY" && ! -L "$OTA_OWNER_PUBLIC_KEY" ]] || {
+    echo "ERROR: OTA owner public key is missing or unsafe: $OTA_OWNER_PUBLIC_KEY" >&2
+    exit 1
+  }
+  cmp -s "$OTA_OWNER_PUBLIC_KEY" "$OTA_PUBLIC_KEY" && {
+    echo "ERROR: OTA owner and maintainer public keys must differ" >&2
+    exit 1
+  }
+  ota_owner_public_key_sha="$(sha256sum "$OTA_OWNER_PUBLIC_KEY" | awk '{print $1}')"
+  owner_key_builder_args=(--ota-owner-public-key "$OTA_OWNER_PUBLIC_KEY")
+  owner_key_verifier_args=(--expected-ota-owner-public-key-sha256 "$ota_owner_public_key_sha")
+fi
 if [[ "$IMAGE_PROFILE" == ota && "$OTA_SIGNING_MODE" == local ]]; then
   [[ -f "$OTA_SIGNING_KEY" && ! -L "$OTA_SIGNING_KEY" ]] || {
     echo "ERROR: OTA profile requires a local signing key: $OTA_SIGNING_KEY" >&2
@@ -510,6 +533,13 @@ if [[ "$IMAGE_PROFILE" == ota && "$OTA_SIGNING_MODE" == local ]]; then
     echo "ERROR: OTA signing key must not be group/world accessible" >&2
     exit 1
   }
+  if ! cmp -s "$OTA_SIGNING_PUBLIC_KEY" "$OTA_PUBLIC_KEY"; then
+    [[ -n "$OTA_OWNER_PUBLIC_KEY" ]] &&
+      cmp -s "$OTA_SIGNING_PUBLIC_KEY" "$OTA_OWNER_PUBLIC_KEY" || {
+        echo "ERROR: local OTA signer is not trusted by the candidate image" >&2
+        exit 1
+      }
+  fi
 fi
 [[ -x "$OTA_MUSL_CC" && -f "$OTA_MUSL_SYSROOT/usr/include/errno.h" ]] || {
   echo "ERROR: missing ARMv7 musl compiler/sysroot for OTA boot control" >&2
@@ -1967,6 +1997,7 @@ python3 -B "$BUILDER" \
   --feature-policy "$FEATURE_POLICY" \
   --bootctl "$OTA_BOOTCTL" \
   --update-verifier "$OTA_VERIFIER" --ota-public-key "$OTA_PUBLIC_KEY" \
+  "${owner_key_builder_args[@]}" \
   --audio-probe "$RUN/audio_probe" \
   --tinyplay "$RUN/tinyplay" --tinycap "$RUN/tinycap" --tinymix "$RUN/tinymix" \
   --iwconfig "$RUN/iwconfig" \
@@ -2016,6 +2047,7 @@ python3 -B "$VERIFIER" \
   --expected-bootctl-sha256 "$ota_bootctl_sha" \
   --expected-update-verifier-sha256 "$ota_verifier_sha" \
   --expected-ota-public-key-sha256 "$ota_public_key_sha" \
+  "${owner_key_verifier_args[@]}" \
   --expected-ui-manifest-sha256 "$ui_manifest_sha" \
   --expected-ui-commit "$ui_commit" --expected-ui-diff-sha256 "$ui_diff_sha" \
   "${ssh_verifier_args[@]}" \
@@ -2123,7 +2155,7 @@ if [[ "$IMAGE_PROFILE" == ota && "$OTA_SIGNING_MODE" == local ]]; then
   python3 -B "$OTA_DIR/make_ota_bundle.py" \
     --boot-image "$RUN/boot.img" --build-manifest "$RUN/manifest.json" \
     --version "$run_id" \
-    --signing-key "$OTA_SIGNING_KEY" --public-key "$OTA_PUBLIC_KEY" \
+    --signing-key "$OTA_SIGNING_KEY" --public-key "$OTA_SIGNING_PUBLIC_KEY" \
     --service-profile "$SERVICE_PROFILE" --feature-policy "$FEATURE_POLICY" \
     --update-channel "$UPDATE_CHANNEL" \
     --output "$ota_bundle" | tee "$RUN/ota-bundle.log"
@@ -2252,6 +2284,8 @@ marker_contract=PASS
 ota_bootctl_sha256=$ota_bootctl_sha
 ota_update_verifier_sha256=$ota_verifier_sha
 ota_public_key_sha256=$ota_public_key_sha
+ota_owner_public_key_sha256=$ota_owner_public_key_sha
+ota_signing_public_key_sha256=$ota_signing_public_key_sha
 ota_signing_mode=$OTA_SIGNING_MODE
 ota_bundle=$ota_bundle
 ota_bundle_sha256=$ota_bundle_sha
@@ -2371,6 +2405,8 @@ ramdisk=$RUN/boot.ramdisk.cpio.gz
 ota_bootctl_sha256=$ota_bootctl_sha
 ota_update_verifier_sha256=$ota_verifier_sha
 ota_public_key_sha256=$ota_public_key_sha
+ota_owner_public_key_sha256=$ota_owner_public_key_sha
+ota_signing_public_key_sha256=$ota_signing_public_key_sha
 ota_signing_mode=$OTA_SIGNING_MODE
 ota_bundle=$ota_bundle
 ota_bundle_sha256=$ota_bundle_sha
