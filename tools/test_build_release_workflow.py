@@ -398,6 +398,18 @@ class Tests(unittest.TestCase):
   self.assertIn('IFS= read -r release_notes_title <"$RELEASE_NOTES"', W)
   self.assertNotIn('checked-in release-notes file is required', (ROOT/'build/README.md').read_text())
 
+ def test_owner_ota_signing_keeps_maintainer_trust(self):
+  self.assertIn('LIBREECHO_OTA_OWNER_PUBLIC_KEY', B)
+  self.assertIn('LIBREECHO_OTA_SIGNING_PUBLIC_KEY', B)
+  self.assertIn('--ota-owner-public-key', B)
+  self.assertIn('--expected-ota-owner-public-key-sha256', B)
+  self.assertIn('local OTA signer is not trusted by the candidate image', B)
+  self.assertIn(
+   '--signing-key "$OTA_SIGNING_KEY" --public-key "$OTA_SIGNING_PUBLIC_KEY"', B
+  )
+  self.assertIn('ota_owner_public_key_sha256=$ota_owner_public_key_sha', B)
+  self.assertIn('ota_signing_public_key_sha256=$ota_signing_public_key_sha', B)
+
  def test_nightly_release_tag_is_accepted(self):
   installer = (ROOT/'tools/libreecho-install.py').read_text()
   self.assertIn('(?:nightly|build)-[0-9a-f-]+', installer)

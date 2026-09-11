@@ -84,3 +84,19 @@ source identities, OTA hash, public key, feature payload hashes, installer
 bundle, release notes, and complete `SHA256SUMS`. It does not flash hardware or
 claim runtime acceptance. Configure the protected environment secret and
 approval rules before attempting a stable dispatch.
+
+## Optional owner signing authority
+
+A local owner build can retain the normal maintainer OTA key while adding an
+owner-controlled signing authority. Set `LIBREECHO_OTA_OWNER_PUBLIC_KEY` to the
+owner public-key file, `LIBREECHO_OTA_SIGNING_PUBLIC_KEY` to the same file, and
+`LIBREECHO_OTA_SIGNING_KEY` to its mode-0600 private key. Use
+`LIBREECHO_OTA_SIGNING_MODE=local`. The build fails before packaging if the
+selected signer is neither the embedded maintainer key nor the separately
+embedded owner key.
+
+The owner private key must remain outside the repository and build output. The
+Platform image independently verifies the additional public-key hash and
+persists the owner trust root in userdata only after package authentication and
+before any boot partition write. This does not authorize installing or
+publishing the resulting artifact.
